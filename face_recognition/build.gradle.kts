@@ -40,5 +40,8 @@ dependencies {
     implementation("androidx.camera:camera-view:1.3.1")
     implementation("androidx.camera:camera-extensions:1.3.1")
 
+    // Google Vision ML Kit
+    implementation("com.google.mlkit:face-detection:16.1.5")
+
     implementation("androidx.core:core-ktx:1.12.0")
 }
