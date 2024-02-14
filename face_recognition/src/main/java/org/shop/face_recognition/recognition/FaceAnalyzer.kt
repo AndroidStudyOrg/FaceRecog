@@ -1,6 +1,9 @@
 package org.shop.face_recognition.recognition
 
+import android.graphics.PointF
+import android.graphics.RectF
 import android.media.Image
+import android.util.SizeF
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.view.PreviewView
@@ -11,6 +14,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import kotlin.math.abs
 
 internal class FaceAnalyzer(
     lifecycle: Lifecycle,
@@ -20,6 +24,16 @@ internal class FaceAnalyzer(
 
     private var widthScaleFactor = 1F
     private var heightScaleFactor = 1F
+
+    /**
+     *  얼굴인식 모듈자체가 후면 카메라 위주로 되어 있음
+     *  따라서 전면카메라로 인식했을 때 좌우로 반전해주는 부분이 필요함
+     *  그를 위한 변수 4개
+     */
+    private var preCenterX = 0F
+    private var preCenterY = 0F
+    private var preWidth = 0F
+    private var preHeight = 0F
 
     /**
      *  FaceDetectorOptions 빌더로 생성
@@ -78,6 +92,8 @@ internal class FaceAnalyzer(
                 listener?.stopDetect()
                 detector.close()
             }
+
+            calDetectSize(face)
         } else if (detectStatus != FaceAnalyzerStatus.UnDetect
             && detectStatus != FaceAnalyzerStatus.Smile
         ) {
@@ -121,6 +137,62 @@ internal class FaceAnalyzer(
             }
     }
 
+    /**
+     *  rect 좌표랑 크기, centerX, Y까지 구함
+     *  이것을 매번 호출하게 되면 베지에 곡선으로 만들 얼굴인식된 달걀형 마스크가 자글자글해지면서 계속해서 깨지는 것처럼 보일 수 있음
+     *  따라서 offset을 두고 control
+     */
+    private fun calDetectSize(face: Face) {
+        /**
+         *  박스의 크기 구함
+         */
+        val rect = face.boundingBox
+        val boxWidth = rect.right - rect.left
+        val boxHeight = rect.bottom - rect.top
+
+        /**
+         *  좌표를 구함
+         */
+        val left = rect.right.translateX() - (boxWidth / 2)
+        val top = rect.top.translateY() - (boxHeight / 2)
+        val right = rect.left.translateX() + (boxWidth / 2)
+        val bottom = rect.bottom.translateY()
+
+        /**
+         *  계산된 영역의 너비와 높이, X, Y(중앙점)들을 계산해주는 변수 추가
+         */
+        val width = right - left
+        val height = bottom - top
+        val centerX = left + width / 2
+        val centerY = top + height / 2
+
+        if (abs(preCenterX - centerX) > PIVOT_OFFSET
+            || abs(preCenterY - centerY) > PIVOT_OFFSET
+            || abs(preWidth - width) > SIZE_OFFSET
+            || abs(preHeight - height) > SIZE_OFFSET
+        ) {
+            listener?.faceSize(
+                RectF(left, top, right, bottom),
+                SizeF(width, height),
+                PointF(centerX, centerY)
+            )
+
+            /**
+             *  preCenterX, preCenterY, preWidth, preHeight 를 저장해서 다음번에 들어왔을 때 개선하기 위해 set
+             */
+            preCenterX = centerX
+            preCenterY = centerY
+            preWidth = width
+            preHeight = height
+        }
+    }
+
+    /**
+     * X와 Y를 옮겨주는 확장함수
+     */
+    private fun Int.translateX() = preview.width - (toFloat() * widthScaleFactor)
+    private fun Int.translateY() = toFloat() * heightScaleFactor
+
     companion object {
         /**
          *  예를 들어 윙크를 했을 때 어느 정도 깜빡여야 성공으로 하는가에 대한 기준
@@ -129,5 +201,11 @@ internal class FaceAnalyzer(
          */
         private const val EYE_SUCCESS_VALUE = 0.1F
         private const val SMILE_SUCCESS_VALUE = 0.8F
+
+        /**
+         *  offset
+         */
+        private const val PIVOT_OFFSET = 15
+        private const val SIZE_OFFSET = 30
     }
 }
