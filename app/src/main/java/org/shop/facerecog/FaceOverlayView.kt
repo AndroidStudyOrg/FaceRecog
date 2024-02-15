@@ -1,11 +1,13 @@
 package org.shop.facerecog
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PathMeasure
 import android.graphics.PointF
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
@@ -40,6 +42,12 @@ class FaceOverlayView @JvmOverloads constructor(
         pathEffect = DashPathEffect(floatArrayOf(10f, 10f), 0f)
     }
 
+    private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.YELLOW
+        style = Paint.Style.STROKE
+        strokeWidth = 10F
+    }
+
     /**
      *  MaskPaint
      */
@@ -49,11 +57,18 @@ class FaceOverlayView @JvmOverloads constructor(
     }
 
     private val facePath = Path()
+    private var progress = 0F
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
+        /**
+         *  순서에 주의
+         *  Progress를 Overlay 다음에 그려야 점선위에 표현이 된다
+         *  순서가 바뀌게 되면 Progress가 먼저 그려지기 때문에 제대로 표현되지 않는다
+         */
         drawOverlay(canvas)
+        drawProgress(canvas)
     }
 
     /**
@@ -99,8 +114,23 @@ class FaceOverlayView @JvmOverloads constructor(
         postInvalidate()
     }
 
+    /**
+     *  모듈에서 Progress를 던져줄 때 여기로 들어와서 이것을 Animation 처리해가지고 onDraw를 실행
+     *  Animation 처리를 위해 ValueAnimator를 사용
+     */
+    fun setProgress(progress: Float) {
+        ValueAnimator.ofFloat(this.progress, progress).apply {
+            duration = ANIMATE_DURATION
+            addUpdateListener {
+                this@FaceOverlayView.progress = it.animatedValue as Float
+                invalidate()
+            }
+        }.start()
+    }
+
     fun reset() {
         facePath.reset()
+        progress = 0F
         invalidate()
     }
 
@@ -108,5 +138,24 @@ class FaceOverlayView @JvmOverloads constructor(
         canvas.drawRect(0F, 0F, canvas.width.toFloat(), canvas.height.toFloat(), backgroundPaint)
         canvas.drawPath(facePath, maskPaint)
         canvas.drawPath(facePath, facePaint)
+    }
+
+    private fun drawProgress(canvas: Canvas) {
+        val measure = PathMeasure(facePath, true)
+        val pathLength = measure.length
+        val total = pathLength - (pathLength * (progress / 100))    // 실제 그려줘야 하는 total 값
+
+        /**
+         *  Dash 형태로 위에 덧칠
+         */
+        val pathEffect = DashPathEffect(floatArrayOf(pathLength, pathLength), total)
+
+        progressPaint.pathEffect = pathEffect
+
+        canvas.drawPath(facePath, progressPaint)
+    }
+
+    companion object {
+        private const val ANIMATE_DURATION = 500L
     }
 }
