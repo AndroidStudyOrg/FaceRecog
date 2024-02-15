@@ -15,6 +15,15 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <org.shop.facerecog.FaceOverlayView
+        android:id="@+id/faceOverlayView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/startDetectButton"
         android:layout_width="wrap_content"
@@ -37,9 +46,9 @@
         android:layout_width="300dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="48dp"
+        android:background="@drawable/rectangle_white_r10"
         android:gravity="center"
         android:paddingStart="24dp"
-        android:background="@drawable/rectangle_white_r10"
         android:paddingTop="16dp"
         android:paddingEnd="24dp"
         android:paddingBottom="16dp"
