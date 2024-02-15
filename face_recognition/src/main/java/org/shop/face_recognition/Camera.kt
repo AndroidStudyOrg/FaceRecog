@@ -6,7 +6,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -14,6 +16,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.google.common.util.concurrent.ListenableFuture
+import org.shop.face_recognition.recognition.FaceAnalyzer
+import org.shop.face_recognition.recognition.FaceAnalyzerListener
 import java.util.concurrent.Executors
 
 class Camera(private val context: Context) : ActivityCompat.OnRequestPermissionsResultCallback {
@@ -31,9 +35,11 @@ class Camera(private val context: Context) : ActivityCompat.OnRequestPermissions
     private lateinit var previewView: PreviewView
 
     private var cameraExecutor = Executors.newSingleThreadExecutor()
+    private var listener: FaceAnalyzerListener? = null
 
     // FrameLayout이 Layout Param으로 들어옴
-    fun initCamera(layout: ViewGroup) {
+    fun initCamera(layout: ViewGroup, listener: FaceAnalyzerListener) {
+        this.listener = listener
         previewView = PreviewView(context)
         layout.addView(previewView)
         permissionCheck(context)
@@ -55,7 +61,9 @@ class Camera(private val context: Context) : ActivityCompat.OnRequestPermissions
 
     private fun openPreview() {
         cameraProviderFuture = ProcessCameraProvider.getInstance(context).also { providerFuture ->
-            providerFuture.addListener({}, ContextCompat.getMainExecutor(context))
+            providerFuture.addListener({
+                startPreview(context)
+            }, ContextCompat.getMainExecutor(context))
         }
     }
 
@@ -66,6 +74,38 @@ class Camera(private val context: Context) : ActivityCompat.OnRequestPermissions
             cameraProvider.bindToLifecycle(context as LifecycleOwner, cameraSelector, preview)
         } catch (e: Exception) {
             e.stackTrace
+        }
+    }
+
+    /**
+     *  MainActivity에서 호출해서 실제 얼굴인식을 실행시키라는 함수
+     */
+    fun startFaceDetect() {
+        val camersProvider = cameraProviderFuture.get()
+        val faceAnalyzer =
+            FaceAnalyzer((context as ComponentActivity).lifecycle, previewView, listener)
+        val analysisUseCase = ImageAnalysis.Builder().build().also {
+            it.setAnalyzer(cameraExecutor, faceAnalyzer)
+        }
+
+        try {
+            camersProvider.bindToLifecycle(
+                context as LifecycleOwner,
+                cameraSelector,
+                preview,
+                analysisUseCase
+            )
+        } catch (e: Exception) {
+
+        }
+    }
+
+    fun stopFaceDetect() {
+        try {
+            cameraProviderFuture.get().unbindAll()
+            previewView.releasePointerCapture()
+        } catch (e: Exception) {
+
         }
     }
 
